@@ -14,3 +14,285 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import curses
+import select
+import sys
+from datetime import datetime, timedelta
+from typing import Tuple
+import powerSaver
+
+version = "1.0"
+sleep_time = 0.1
+
+processes = [
+  {'title': "Chrome",
+   'name':  ["chrome"]},
+  {'title': "Qutebrowser",
+   'name':  ['qutebrowser', 'QtWebEngineProcess']},
+  {'title': "Discord",
+   'name': ["Discord"]},
+  {'title': "JetBrains Toolbox",
+   'name': ["jetbrains-toolbox"]},
+  {'title': "PyCharm",
+   'name': ["java"],
+   'cmdline': "PyCharm"},
+  {'title': "CLion",
+   'name': ["java"],
+   'cmdline': "CLion"},
+  {'title': "LibreOffice",
+   'name': ["soffice.bin"]},
+  {'title': "Pulse Audion Volume Control",
+   'name': ["pavucontrol"]},
+  {'title': "Zen Monitor",
+   'name': ["zenmonitor"]},
+]
+
+services = [
+  {'title': "Bluetooth",
+   'name':  "bluetooth"},
+  {'title': "Docker",
+   'name':  "docker"},
+  {'title': "sshd",
+   'name':  "sshd"},
+  {'title': "Mosquitto",
+   'name':  "mosquitto"},
+  {'title': "WiFi",
+   'name':  "net.wlo1"},
+  {'title': "Ethernet",
+   'name':  "net.enp2s0"},
+]
+
+
+def process_color(status: powerSaver.ProcessStatus) -> Tuple[int, int]:
+  if status == powerSaver.ProcessStatus.RUNNING:
+    return 2, curses.A_NORMAL
+  if status == powerSaver.ProcessStatus.STOPPED:
+    return 4, curses.A_NORMAL
+  if status == powerSaver.ProcessStatus.NO_PROC:
+    return 1, curses.A_DIM
+  if status == powerSaver.ProcessStatus.MANY:
+    return 3, curses.A_NORMAL
+  return 15, curses.A_NORMAL
+
+
+def service_color(status: powerSaver.ServiceStatus) -> Tuple[int, int]:
+  if status == powerSaver.ServiceStatus.RUNNING:
+    return 2, curses.A_NORMAL
+  if status == powerSaver.ServiceStatus.STOPPED:
+    return 4, curses.A_NORMAL
+  if status == powerSaver.ServiceStatus.TOGGLED:
+    return 3, curses.A_NORMAL
+  if status == powerSaver.ServiceStatus.NOT_FOUND:
+    return 1, curses.A_DIM
+  if status == powerSaver.ServiceStatus.CRASHED:
+    return 7, curses.A_NORMAL
+  return 15, curses.A_NORMAL
+
+
+def menu_entry(stdscr: curses.window, y: int, text: str, text_format: Tuple[int, int], offset: int = 0):
+  color, attr = text_format
+  stdscr.attron(attr)
+  stdscr.attron(curses.color_pair(color+offset))
+  stdscr.addstr(y, 0, text)
+  stdscr.attroff(curses.color_pair(color+offset))
+  stdscr.attroff(attr)
+
+
+def color_offset(check: bool) -> int:
+  if check:
+    return 7
+  return 0
+
+
+def draw_menu(stdscr: curses.window):
+  poll_object = select.poll()
+  poll_object.register(sys.stdin, select.POLLIN)
+
+  k = 0
+  # cursor_x = 0
+  cursor_y = 0
+  refresh  = 5
+  last_update = datetime.now() - timedelta(seconds=refresh)
+
+  stdscr.clear()
+  stdscr.refresh()
+  stdscr.nodelay(True)
+
+  # Colors
+  if not curses.has_colors():
+    Exception("No colors")
+  curses.start_color()
+  curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLACK)
+  curses.init_pair(2, curses.COLOR_GREEN, curses.COLOR_BLACK)
+  curses.init_pair(3, curses.COLOR_YELLOW, curses.COLOR_BLACK)
+  curses.init_pair(4, curses.COLOR_RED, curses.COLOR_BLACK)
+  curses.init_pair(5, curses.COLOR_CYAN, curses.COLOR_BLACK)
+  curses.init_pair(6, curses.COLOR_BLUE, curses.COLOR_BLACK)
+  curses.init_pair(7, curses.COLOR_MAGENTA, curses.COLOR_BLACK)
+
+  curses.init_pair(8, curses.COLOR_BLACK, curses.COLOR_WHITE)
+  curses.init_pair(9, curses.COLOR_GREEN, curses.COLOR_WHITE)
+  curses.init_pair(10, curses.COLOR_YELLOW, curses.COLOR_WHITE)
+  curses.init_pair(11, curses.COLOR_RED, curses.COLOR_WHITE)
+  curses.init_pair(12, curses.COLOR_CYAN, curses.COLOR_WHITE)
+  curses.init_pair(13, curses.COLOR_BLUE, curses.COLOR_WHITE)
+  curses.init_pair(14, curses.COLOR_MAGENTA, curses.COLOR_WHITE)
+
+  curses.init_pair(15, curses.COLOR_BLACK, curses.COLOR_RED)
+  curses.init_pair(15+7, curses.COLOR_BLUE, curses.COLOR_RED)
+
+  first_run = True
+  while k != ord('q'):
+    height, width = stdscr.getmaxyx()
+    now = datetime.now()
+
+    process_manager = powerSaver.ProcessManager(False)
+    service_manager = powerSaver.ServiceManager("sysvinit", False)
+
+    toggle = False
+    skip   = False
+
+    if k == curses.KEY_DOWN:
+      cursor_y = cursor_y + 1
+    elif k == curses.KEY_UP:
+      cursor_y = cursor_y - 1
+    elif k == ord('+'):
+      refresh += 1
+    elif k == ord('-'):
+      refresh -= 1
+    elif k in [curses.KEY_ENTER, ord('\n'), ord(' '), ord('\r')]:
+      toggle = True
+    elif not first_run:
+      skip = True
+
+
+    first_run = False
+    if last_update + timedelta(seconds=refresh) < now :
+      last_update = now
+      process_manager.update_processes_information()
+      skip = False
+    # elif k == curses.KEY_RIGHT:
+    #   cursor_x = cursor_x + 1
+    # elif k == curses.KEY_LEFT:
+    #   cursor_x = cursor_x - 1
+
+    # cursor_x = max(0, cursor_x)
+    # cursor_x = min(width - 1, cursor_x)
+
+    if not skip:
+      cursor_y = max(0, cursor_y)
+      cursor_y = min(min(height - 1, len(processes) + len(services) - 1), cursor_y)
+      refresh  = max(0, min(refresh, 15))
+
+      # Strings
+      title = f"powerSaver v{version}"[:width-1]
+      status = f"refresh rate -({refresh}s)+ | cursor: {cursor_y}"[:width-1]
+
+    max_len = len(title)
+    no_proc = 0
+    for y, p in enumerate(processes):
+      p["display_title"] = p["title"][:width-1]
+      max_len = max(len(p["display_title"]), max_len)
+      p_status = set()
+      for proc in p["name"]:
+        if "cmdline" in p:
+          proc_status = process_manager.get_process_status(proc, p["cmdline"])
+        else:
+          proc_status = process_manager.get_process_status(proc)
+        for p_s in proc_status:
+          p_status.add(p_s)
+      if len(p_status) > 0:
+        no_proc = 0
+      if powerSaver.ProcessStatus.ERROR in p_status:
+        p["status"] = powerSaver.ProcessStatus.ERROR
+      elif len(p_status) == 0:
+        no_proc += 1
+        p["status"] = powerSaver.ProcessStatus.NO_PROC
+        if cursor_y == y:
+          if k == curses.KEY_UP:
+            cursor_y -= no_proc
+          else:
+            cursor_y += 1
+      elif len(p_status) > 1:
+        p["status"] = powerSaver.ProcessStatus.MANY
+      else:
+        p["status"] = p_status.pop()
+    not_found = 0
+    for y, s in enumerate(services):
+      s["display_title"] = s["title"][:width-1]
+      max_len = max(len(s["display_title"]), max_len)
+      if "status" not in s or last_update > now - timedelta(seconds=refresh):
+        s["status"] = service_manager.get_status(s["name"])
+        if s["status"] == powerSaver.ServiceStatus.NOT_FOUND:
+          not_found += 1
+          if cursor_y - len(processes) == y:
+            if cursor_y == y:
+              if k == curses.KEY_UP:
+                cursor_y -= not_found
+              else:
+                cursor_y += 1
+        else:
+          not_found = 0
+    if not skip:
+      stdscr.clear()
+
+      # Draw Title
+      stdscr.attron(curses.A_BOLD)
+      stdscr.addstr(0, 0, title)
+
+      # Divider
+      stdscr.addstr(1, 0, "-"*min(width - 1, max_len))
+      stdscr.attroff(curses.A_BOLD)
+
+      # Processes
+      n = 2
+      for y, p in enumerate(processes):
+        offset = color_offset(cursor_y == y)
+        menu_entry(stdscr, y+n, p["display_title"], process_color(p["status"]), offset)
+      n += len(processes)
+
+      # Divider
+      stdscr.addstr(n, 0, "-"*min(width - 1, max_len))
+      n += 1
+
+      # Services
+      for y, s in enumerate(services):
+        offset = color_offset(cursor_y == y + len(processes))
+        menu_entry(stdscr, y+n, s["display_title"], service_color(s["status"]), offset)
+
+      # Status
+      stdscr.addstr(height -1, 0, status)
+
+      # Refresh the screen
+      stdscr.refresh()
+
+      # Execute action
+      if toggle:
+        if cursor_y < len(processes):
+          status = processes[cursor_y]["status"]
+          for name in processes[cursor_y]["name"]:
+            cmdline_filter = None
+            if "cmdline" in processes[cursor_y]:
+              cmdline_filter = processes[cursor_y]["cmdline"]
+            if status in [powerSaver.ProcessStatus.STOPPED, powerSaver.ProcessStatus.MANY]:
+              process_manager.signal_processes(name, cmdline_filter, False)
+            elif status == powerSaver.ProcessStatus.RUNNING:
+              process_manager.signal_processes(name, cmdline_filter, True)
+        elif cursor_y - len(processes) < len(services): # Services
+          cursor = cursor_y - len(processes)
+          status = services[cursor]["status"]
+          if status in [powerSaver.ServiceStatus.STOPPED, powerSaver.ServiceStatus.CRASHED]:
+            service_manager.start_service(services[cursor]["name"])
+            services[cursor]["status"] = powerSaver.ServiceStatus.TOGGLED
+          elif status == powerSaver.ServiceStatus.RUNNING:
+            service_manager.stop_service(services[cursor]["name"])
+            services[cursor]["status"] = powerSaver.ServiceStatus.TOGGLED
+
+    # Wait for next input
+    poll_object.poll(refresh * 1000)
+    k = stdscr.getch()
+
+
+if __name__ == '__main__':
+  curses.wrapper(draw_menu)
+

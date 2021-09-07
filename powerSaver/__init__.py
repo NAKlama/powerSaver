@@ -15,6 +15,10 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 
-import processManager
+import powerSaver.processManager
+import powerSaver.serviceManager
 
 from .processManager import ProcessManager
+from .processManager import ProcessStatus
+from .serviceManager import ServiceManager
+from .serviceManager import ServiceStatus

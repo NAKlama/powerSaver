@@ -41,6 +41,7 @@ class ServiceStatus(Enum):
   CRASHED   = "crashed"
   NOT_FOUND = "service not found"
   UNKNOWN   = "unknown"
+  TOGGLED   = "toggled"
 
 
 class ServiceManager(object):
@@ -95,6 +96,7 @@ class ServiceManager(object):
     script = "/etc/init.d/" + name
     if not is_exe(script):
       return None
+    command.append(script)
     return command
 
   @staticmethod
@@ -143,7 +145,7 @@ class ServiceManager(object):
       return False
 
     command.append("start")
-    run_result = subprocess.run(command)
+    run_result = subprocess.run(command, capture_output=True)
     if run_result.returncode != 0:
       return False
     return True
@@ -163,7 +165,7 @@ class ServiceManager(object):
       return False
 
     command.append("stop")
-    run_result = subprocess.run(command)
+    run_result = subprocess.run(command, capture_output=True)
     if run_result.returncode != 0:
       return False
     return True

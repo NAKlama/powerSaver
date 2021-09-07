@@ -17,77 +17,107 @@
 import subprocess
 import string
 from collections import defaultdict
+from copy import copy
 from datetime import datetime
+from enum import Enum
 from typing import Dict, List, Tuple, Set
 
 import psutil
 
-_signal_processes_table = defaultdict(str)
+_signal_processes_table = []
 for c in string.ascii_letters:
-  _signal_processes_table[c] = c
+  _signal_processes_table.append(c)
 for c in string.digits:
-  _signal_processes_table[c] = c
+  _signal_processes_table.append(c)
 for c in "_.-+/":
-  _signal_processes_table[c] = c
+  _signal_processes_table.append(c)
 
 
 def sanitize_process_name(name: str) -> str:
-  return name.translate(_signal_processes_table)
+  output = ""
+  for c in name:
+    if c in _signal_processes_table:
+      output += c
+  return output
+
+
+
+class ProcessStatus(Enum):
+  RUNNING = 0
+  STOPPED = 1
+  NO_PROC = 2
+  MANY    = 3
+  ERROR   = 4
 
 
 class ProcessManager(object):
   sudo: bool
-  processes: Dict[str, List[str]]
-  process_names: Set[str]
+  processes: Dict[str, List[Tuple[int, str, str]]]
   processes_updated: datetime
 
   def __init__(self, sudo: bool = True):
     self.sudo = sudo
+    self.update_processes_information()
 
-  def signal_processes(self, name: str, stop: bool = True) -> bool:
+  def signal_processes(self, name: str, cmdline_filter: str = None, stop: bool = True) -> bool:
     command = []
+    call_results = []
     if self.sudo:
       command.append("sudo")
-    command.append("killall")
+    command.append("kill")
     command.append("-s")
     if stop:
       command.append("SIGSTOP")
     else:
       command.append("SIGCONT")
-    command.append(sanitize_process_name(name))
-    call_result = subprocess.run(command)
-    if call_result.returncode == 0:
+    self.update_processes_information()
+    for pid, cmdline_list, status in self.processes[name]:
+      run_command = copy(command)
+      run_command.append(str(pid))
+      if cmdline_filter is None:
+        call_result = subprocess.run(run_command, capture_output=True)
+        call_results.append(call_result.returncode)
+      else:
+        for cmdline in cmdline_list:
+          if cmdline_filter in cmdline:
+            call_result = subprocess.run(run_command, capture_output=True)
+            call_results.append(call_result.returncode)
+
+    if sum(call_results) == 0:
       return True
     return False
 
   def update_processes_information(self):
     self.processes = {}
-    self.process_names = set()
-    for proc in psutil.process_iter(['name', 'status']):
-      self.process_names.add(proc.info["name"])
+    for proc in psutil.process_iter(['name', 'pid', 'cmdline', 'status']):
       if proc.info["name"] not in self.processes:
         self.processes[proc.info["name"]] = []
-      self.processes[proc.info["name"]].append(proc.info["status"])
+      self.processes[proc.info["name"]].append((proc.info["pid"],
+                                                proc.info["cmdline"],
+                                                proc.info["status"]))
 
-  def get_process_status(self, name: str, partial: bool = False, startswith: bool = False) -> Set[str]:
+  @staticmethod
+  def decode_status(status: str) -> ProcessStatus:
+    if status == psutil.STATUS_STOPPED:
+      return ProcessStatus.STOPPED
+    if status in [psutil.STATUS_DEAD, psutil.STATUS_ZOMBIE]:
+      return ProcessStatus.ERROR
+    return ProcessStatus.RUNNING
+
+  def get_process_status(self, name: str,
+                         cmdline_filter: str = None) -> Set[ProcessStatus]:
     output = set()
     if name in self.processes:
-      proc_list = [name]
+      proc = name
     else:
-      proc_list = []
+      return set()
 
-    if partial:
-      for pname in self.process_names:
-        if name in pname:
-          proc_list.append(pname)
-    else:
-      if startswith:
-        for pname in self.process_names:
-          if pname.startswith(name):
-            proc_list.append(pname)
-
-    for proc in proc_list:
-      for status in self.processes[proc]:
-        output.add(status)
+    for pid, cmdline_list, status in self.processes[proc]:
+      if cmdline_filter is not None:
+        for cmdline in cmdline_list:
+          if cmdline_filter in cmdline:
+            output.add(ProcessManager.decode_status(status))
+      else:
+        output.add(ProcessManager.decode_status(status))
 
     return output
