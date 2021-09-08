@@ -17,8 +17,11 @@
 
 import powerSaver.processManager
 import powerSaver.serviceManager
+import powerSaver.moduleManager
 
 from .processManager import ProcessManager
 from .processManager import ProcessStatus
 from .serviceManager import ServiceManager
 from .serviceManager import ServiceStatus
+from .moduleManager import ModuleManager
+from .moduleManager import ModuleStatus

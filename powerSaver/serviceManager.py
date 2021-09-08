@@ -36,12 +36,13 @@ class ServiceStatusFunctionUnimplemented(Exception):
 
 
 class ServiceStatus(Enum):
-  RUNNING   = "running"
-  STOPPED   = "stopped"
-  CRASHED   = "crashed"
-  NOT_FOUND = "service not found"
-  UNKNOWN   = "unknown"
-  TOGGLED   = "toggled"
+  RUNNING     = "running"
+  STOPPED     = "stopped"
+  CRASHED     = "crashed"
+  NOT_FOUND   = "service not found"
+  NO_MODULES  = "no modules"
+  UNKNOWN     = "unknown"
+  TOGGLED     = "toggled"
 
 
 class ServiceManager(object):

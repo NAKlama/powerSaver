@@ -47,7 +47,7 @@ class ProcessStatus(Enum):
   STOPPED = 1
   NO_PROC = 2
   MANY    = 3
-  ERROR   = 4
+  ERROR   = 100
 
 
 class ProcessManager(object):

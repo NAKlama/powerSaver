@@ -18,13 +18,15 @@ import curses
 import select
 import sys
 from datetime import datetime, timedelta
-from typing import Tuple
+from typing import Tuple, List, Dict, Union
+
 import powerSaver
 
 version = "1.0"
 sleep_time = 0.1
 
-processes = [
+
+processes: List[Dict[str, Union[str, List[str], powerSaver.ProcessStatus]]] = [
   {'title': "Chrome",
    'name':  ["chrome"]},
   {'title': "Qutebrowser",
@@ -47,9 +49,10 @@ processes = [
    'name': ["zenmonitor"]},
 ]
 
-services = [
+services: List[Dict[str, Union[str, List[str], powerSaver.ServiceStatus]]] = [
   {'title': "Bluetooth",
-   'name':  "bluetooth"},
+   'name':  "bluetooth",
+   'needs-modules': ['uhid', 'hidp']},
   {'title': "Docker",
    'name':  "docker"},
   {'title': "sshd",
@@ -57,36 +60,83 @@ services = [
   {'title': "Mosquitto",
    'name':  "mosquitto"},
   {'title': "WiFi",
-   'name':  "net.wlo1"},
-  {'title': "Ethernet",
+   'name':  "net.wlo1",
+   'needs-modules': ['iwlmvm']},
+  {'title': "Ethernet (Builtin)",
    'name':  "net.enp2s0"},
+  {'title': "Ethernet (eth0)",
+   'name':  "net.eth0",
+   'needs-modules': ['cdc_ether', 'r8152']},
+]
+
+modules: List[Dict[str, Union[str, List[str], powerSaver.ModuleStatus]]] = [
+  {'title': "Bluetooth",
+   'usage-modules': ['uhid', 'hidp'],
+   'modules': ['btintel', 'btbcm', 'btrtl', 'btusb', 'hidp', 'uhid'],
+   'service': 'bluetooth'},
+  {'title': "WiFi",
+   'usage-modules': ['iwlmvm'],
+   'modules': ['iwlwifi', 'iwlmvm'],
+   'service': 'net.wlo1'},
+  {'title': "USB-Ethernet",
+   'usage-modules': ['cdc_ether', 'r8152'],
+   'modules': ['mii', 'r8152', 'usbnet', 'cdc_ether']},
+
 ]
 
 
 def process_color(status: powerSaver.ProcessStatus) -> Tuple[int, int]:
   if status == powerSaver.ProcessStatus.RUNNING:
-    return 2, curses.A_NORMAL
-  if status == powerSaver.ProcessStatus.STOPPED:
-    return 4, curses.A_NORMAL
-  if status == powerSaver.ProcessStatus.NO_PROC:
-    return 1, curses.A_DIM
-  if status == powerSaver.ProcessStatus.MANY:
     return 3, curses.A_NORMAL
-  return 15, curses.A_NORMAL
+  if status == powerSaver.ProcessStatus.STOPPED:
+    return 5, curses.A_NORMAL
+  if status == powerSaver.ProcessStatus.NO_PROC:
+    return 2, curses.A_DIM
+  if status == powerSaver.ProcessStatus.MANY:
+    return 4, curses.A_NORMAL
+  return 17, curses.A_NORMAL
 
 
 def service_color(status: powerSaver.ServiceStatus) -> Tuple[int, int]:
   if status == powerSaver.ServiceStatus.RUNNING:
-    return 2, curses.A_NORMAL
-  if status == powerSaver.ServiceStatus.STOPPED:
-    return 4, curses.A_NORMAL
-  if status == powerSaver.ServiceStatus.TOGGLED:
     return 3, curses.A_NORMAL
+  if status == powerSaver.ServiceStatus.STOPPED:
+    return 5, curses.A_NORMAL
+  if status == powerSaver.ServiceStatus.TOGGLED:
+    return 4, curses.A_NORMAL
   if status == powerSaver.ServiceStatus.NOT_FOUND:
-    return 1, curses.A_DIM
+    return 2, curses.A_DIM
   if status == powerSaver.ServiceStatus.CRASHED:
+    return 8, curses.A_NORMAL
+  if status == powerSaver.ServiceStatus.NO_MODULES:
     return 7, curses.A_NORMAL
-  return 15, curses.A_NORMAL
+  return 17, curses.A_NORMAL
+
+
+def module_color(status: powerSaver.ModuleStatus) -> Tuple[int, int]:
+  if status == powerSaver.ModuleStatus.LOADED:
+    return 3, curses.A_NORMAL
+  if status == powerSaver.ModuleStatus.USED:
+    return 6, curses.A_NORMAL
+  if status == powerSaver.ModuleStatus.NOT_LOADED:
+    return 5, curses.A_NORMAL
+  if status == powerSaver.ModuleStatus.PARTIAL:
+    return 4, curses.A_NORMAL
+  return 17, curses.A_NORMAL
+
+
+def service_status_to_module_status(status: powerSaver.ServiceStatus) -> powerSaver.ModuleStatus:
+  if status == powerSaver.ServiceStatus.RUNNING:
+    return powerSaver.ModuleStatus.USED
+  if status == powerSaver.ServiceStatus.STOPPED:
+    return powerSaver.ModuleStatus.NEEDS_CHECK
+  if status == powerSaver.ServiceStatus.TOGGLED:
+    return powerSaver.ModuleStatus.PARTIAL
+  if status == powerSaver.ServiceStatus.NOT_FOUND:
+    return powerSaver.ModuleStatus.NEEDS_CHECK
+  if status == powerSaver.ServiceStatus.CRASHED:
+    return powerSaver.ModuleStatus.NEEDS_CHECK
+  return powerSaver.ModuleStatus.ERROR
 
 
 def menu_entry(stdscr: curses.window, y: int, text: str, text_format: Tuple[int, int], offset: int = 0):
@@ -100,7 +150,7 @@ def menu_entry(stdscr: curses.window, y: int, text: str, text_format: Tuple[int,
 
 def color_offset(check: bool) -> int:
   if check:
-    return 7
+    return 8
   return 0
 
 
@@ -122,32 +172,49 @@ def draw_menu(stdscr: curses.window):
   if not curses.has_colors():
     Exception("No colors")
   curses.start_color()
+  color_gray = -1
+  if curses.can_change_color():
+    max_col_num = max([curses.COLOR_WHITE, curses.COLOR_CYAN, curses.COLOR_BLACK, curses.COLOR_MAGENTA,
+                       curses.COLOR_BLUE, curses.COLOR_RED, curses.COLOR_GREEN, curses.COLOR_YELLOW])
+    color_gray = max_col_num + 1
+    if color_gray < curses.COLORS:
+      curses.init_color(color_gray, 128, 128, 128)
+      curses.init_pair(2, color_gray, curses.COLOR_BLACK)
+      curses.init_pair(10, color_gray, curses.COLOR_WHITE)
+    else:
+      curses.init_pair(2, curses.COLOR_WHITE, curses.COLOR_BLACK)
+      curses.init_pair(10, curses.COLOR_BLACK, curses.COLOR_WHITE)
+  else:
+    curses.init_pair(2, curses.COLOR_WHITE, curses.COLOR_BLACK)
+    curses.init_pair(10, curses.COLOR_BLACK, curses.COLOR_WHITE)
+
   curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLACK)
-  curses.init_pair(2, curses.COLOR_GREEN, curses.COLOR_BLACK)
-  curses.init_pair(3, curses.COLOR_YELLOW, curses.COLOR_BLACK)
-  curses.init_pair(4, curses.COLOR_RED, curses.COLOR_BLACK)
-  curses.init_pair(5, curses.COLOR_CYAN, curses.COLOR_BLACK)
-  curses.init_pair(6, curses.COLOR_BLUE, curses.COLOR_BLACK)
-  curses.init_pair(7, curses.COLOR_MAGENTA, curses.COLOR_BLACK)
+  curses.init_pair(3, curses.COLOR_GREEN, curses.COLOR_BLACK)
+  curses.init_pair(4, curses.COLOR_YELLOW, curses.COLOR_BLACK)
+  curses.init_pair(5, curses.COLOR_RED, curses.COLOR_BLACK)
+  curses.init_pair(6, curses.COLOR_CYAN, curses.COLOR_BLACK)
+  curses.init_pair(7, curses.COLOR_BLUE, curses.COLOR_BLACK)
+  curses.init_pair(8, curses.COLOR_MAGENTA, curses.COLOR_BLACK)
 
-  curses.init_pair(8, curses.COLOR_BLACK, curses.COLOR_WHITE)
-  curses.init_pair(9, curses.COLOR_GREEN, curses.COLOR_WHITE)
-  curses.init_pair(10, curses.COLOR_YELLOW, curses.COLOR_WHITE)
-  curses.init_pair(11, curses.COLOR_RED, curses.COLOR_WHITE)
-  curses.init_pair(12, curses.COLOR_CYAN, curses.COLOR_WHITE)
-  curses.init_pair(13, curses.COLOR_BLUE, curses.COLOR_WHITE)
-  curses.init_pair(14, curses.COLOR_MAGENTA, curses.COLOR_WHITE)
+  curses.init_pair(9, curses.COLOR_BLACK, curses.COLOR_WHITE)
+  curses.init_pair(11, curses.COLOR_GREEN, curses.COLOR_WHITE)
+  curses.init_pair(12, curses.COLOR_YELLOW, curses.COLOR_WHITE)
+  curses.init_pair(13, curses.COLOR_RED, curses.COLOR_WHITE)
+  curses.init_pair(14, curses.COLOR_CYAN, curses.COLOR_WHITE)
+  curses.init_pair(15, curses.COLOR_BLUE, curses.COLOR_WHITE)
+  curses.init_pair(16, curses.COLOR_MAGENTA, curses.COLOR_WHITE)
 
-  curses.init_pair(15, curses.COLOR_BLACK, curses.COLOR_RED)
-  curses.init_pair(15+7, curses.COLOR_BLUE, curses.COLOR_RED)
+  curses.init_pair(17, curses.COLOR_BLACK, curses.COLOR_RED)
+  curses.init_pair(17+8, curses.COLOR_BLUE, curses.COLOR_RED)
+
+  process_manager = powerSaver.ProcessManager(False)
+  service_manager = powerSaver.ServiceManager("sysvinit", False)
+  module_manager  = powerSaver.ModuleManager(False)
 
   first_run = True
   while k != ord('q'):
     height, width = stdscr.getmaxyx()
     now = datetime.now()
-
-    process_manager = powerSaver.ProcessManager(False)
-    service_manager = powerSaver.ServiceManager("sysvinit", False)
 
     toggle = False
     skip   = False
@@ -165,11 +232,14 @@ def draw_menu(stdscr: curses.window):
     elif not first_run:
       skip = True
 
-
     first_run = False
+
+    # Update chaches
     if last_update + timedelta(seconds=refresh) < now :
       last_update = now
       process_manager.update_processes_information()
+      module_manager.update_modules_list()
+
       skip = False
     # elif k == curses.KEY_RIGHT:
     #   cursor_x = cursor_x + 1
@@ -181,12 +251,12 @@ def draw_menu(stdscr: curses.window):
 
     if not skip:
       cursor_y = max(0, cursor_y)
-      cursor_y = min(min(height - 1, len(processes) + len(services) - 1), cursor_y)
+      cursor_y = min(min(height - 1, len(processes) + len(services) + len(modules) - 1), cursor_y)
       refresh  = max(0, min(refresh, 15))
 
-      # Strings
-      title = f"powerSaver v{version}"[:width-1]
-      status = f"refresh rate -({refresh}s)+ | cursor: {cursor_y}"[:width-1]
+    # Strings
+    title = f"powerSaver v{version}"[:width-1]
+    status_msg = f"refresh rate -({refresh}s)+ | cursor: {cursor_y}"[:width-1]
 
     max_len = len(title)
     no_proc = 0
@@ -223,50 +293,47 @@ def draw_menu(stdscr: curses.window):
       max_len = max(len(s["display_title"]), max_len)
       if "status" not in s or last_update > now - timedelta(seconds=refresh):
         s["status"] = service_manager.get_status(s["name"])
-        if s["status"] == powerSaver.ServiceStatus.NOT_FOUND:
-          not_found += 1
-          if cursor_y - len(processes) == y:
-            if cursor_y == y:
-              if k == curses.KEY_UP:
-                cursor_y -= not_found
-              else:
-                cursor_y += 1
+        if "needs-modules" in s:
+          for mod in s["needs-modules"]:
+            if module_manager.get_module_status(mod) not in [powerSaver.ModuleStatus.LOADED, powerSaver.ModuleStatus.USED]:
+              s["status"] = powerSaver.ServiceStatus.NO_MODULES
+      if s["status"] in [powerSaver.ServiceStatus.NOT_FOUND, powerSaver.ServiceStatus.NO_MODULES]:
+        not_found += 1
+        if cursor_y - len(processes) == y:
+          if k == curses.KEY_UP:
+            cursor_y -= not_found
+          else:
+            cursor_y += 1
+      else:
+        not_found = 0
+    for y, m in enumerate(modules):
+      m["display_title"] = m["title"][:width-1]
+      max_len = max(len(m["display_title"]), max_len)
+      if "status" not in m or last_update > now - timedelta(seconds=refresh):
+        status = []
+        if "usage-modules" in m and "service" not in m:
+          for mod in m["usage-modules"]:
+            status.append(module_manager.get_module_status(mod))
+        elif "service" in m:
+          status.append(service_status_to_module_status(service_manager.get_status(m['service'])))
+          if status[0] == powerSaver.ModuleStatus.NEEDS_CHECK:
+            status.clear()
+            for mod in m["usage-modules"]:
+              status.append(module_manager.get_module_status(mod))
+        if powerSaver.ModuleStatus.LOADED in status or powerSaver.ModuleStatus.USED in status:
+          if powerSaver.ModuleStatus.NOT_LOADED in status:
+            m['status'] = powerSaver.ModuleStatus.PARTIAL
+          else:
+            if powerSaver.ModuleStatus.USED in status:
+              m['status'] = powerSaver.ModuleStatus.USED
+            else:
+              m['status'] = powerSaver.ModuleStatus.LOADED
         else:
-          not_found = 0
+          m['status'] = powerSaver.ModuleStatus.NOT_LOADED
+
     if not skip:
-      stdscr.clear()
-
-      # Draw Title
-      stdscr.attron(curses.A_BOLD)
-      stdscr.addstr(0, 0, title)
-
-      # Divider
-      stdscr.addstr(1, 0, "-"*min(width - 1, max_len))
-      stdscr.attroff(curses.A_BOLD)
-
-      # Processes
-      n = 2
-      for y, p in enumerate(processes):
-        offset = color_offset(cursor_y == y)
-        menu_entry(stdscr, y+n, p["display_title"], process_color(p["status"]), offset)
-      n += len(processes)
-
-      # Divider
-      stdscr.addstr(n, 0, "-"*min(width - 1, max_len))
-      n += 1
-
-      # Services
-      for y, s in enumerate(services):
-        offset = color_offset(cursor_y == y + len(processes))
-        menu_entry(stdscr, y+n, s["display_title"], service_color(s["status"]), offset)
-
-      # Status
-      stdscr.addstr(height -1, 0, status)
-
-      # Refresh the screen
-      stdscr.refresh()
-
       # Execute action
+      error_msg = ""
       if toggle:
         if cursor_y < len(processes):
           status = processes[cursor_y]["status"]
@@ -287,6 +354,70 @@ def draw_menu(stdscr: curses.window):
           elif status == powerSaver.ServiceStatus.RUNNING:
             service_manager.stop_service(services[cursor]["name"])
             services[cursor]["status"] = powerSaver.ServiceStatus.TOGGLED
+        elif cursor_y - len(processes) - len(services) < len(modules): # Modules
+          cursor = cursor_y - len(processes) - len(services)
+          status = modules[cursor]["status"]
+          if status in [powerSaver.ModuleStatus.LOADED, powerSaver.ModuleStatus.PARTIAL]:
+            for module in reversed(modules[cursor]["modules"]):
+              module_status = module_manager.get_module_status(module)
+              if module_status == powerSaver.ModuleStatus.LOADED:
+                module_manager.unload_module(module)
+              elif module_status == powerSaver.ModuleStatus.USED and module in modules[cursor]["usage-modules"]:
+                error_msg += f"ModUsed({module}) "
+          elif status == powerSaver.ModuleStatus.NOT_LOADED:
+            for module in modules[cursor]["modules"]:
+              module_manager.load_module(module)
+
+      stdscr.clear()
+
+      # Draw Title
+      stdscr.attron(curses.A_BOLD)
+      stdscr.addstr(0, 0, title)
+
+      # Divider
+      stdscr.addstr(1, 0, "-" * min(width - 1, max_len))
+      stdscr.attroff(curses.A_BOLD)
+
+      n = 2
+      y_offset = 0
+
+      # Processes
+      if len(processes) > 0:
+        for y, p in enumerate(processes):
+          offset = color_offset(cursor_y == y)
+          menu_entry(stdscr, y + n, p["display_title"], process_color(p["status"]), offset)
+        n += len(processes)
+
+        # Divider
+        stdscr.addstr(n, 0, "-" * min(width - 1, max_len))
+        n += 1
+
+      # Services
+      if len(services) > 0:
+        y_offset = len(processes)
+        for y, s in enumerate(services):
+          offset = color_offset(cursor_y == y + y_offset)
+          menu_entry(stdscr, y + n, s["display_title"], service_color(s["status"]), offset)
+        n += len(services)
+
+        # Divider
+        stdscr.addstr(n, 0, "-" * min(width - 1, max_len))
+        n += 1
+
+      # Modules
+      if len(modules) > 0:
+        y_offset += len(services)
+        for y, m in enumerate(modules):
+          offset = color_offset(cursor_y == y + y_offset)
+          menu_entry(stdscr, y + n, m["display_title"], module_color(m["status"]), offset)
+
+      # Status
+      if len(error_msg) > 0:
+        status_msg = f"{status} | {error_msg}"[:width-1]
+      stdscr.addstr(height - 1, 0, status_msg)
+
+      # Refresh the screen
+      stdscr.refresh()
 
     # Wait for next input
     poll_object.poll(refresh * 1000)
