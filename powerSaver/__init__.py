@@ -18,6 +18,7 @@
 import powerSaver.processManager
 import powerSaver.serviceManager
 import powerSaver.moduleManager
+import powerSaver.powerStats
 
 from .processManager import ProcessManager
 from .processManager import ProcessStatus
@@ -25,3 +26,5 @@ from .serviceManager import ServiceManager
 from .serviceManager import ServiceStatus
 from .moduleManager import ModuleManager
 from .moduleManager import ModuleStatus
+from .powerStats import PowerStats
+from .powerStats import BatteryStatus

@@ -15,6 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import curses
+import math
 import select
 import sys
 from datetime import datetime, timedelta
@@ -167,6 +168,7 @@ def draw_menu(stdscr: curses.window):
   stdscr.clear()
   stdscr.refresh()
   stdscr.nodelay(True)
+  curses.curs_set(0)
 
   # Colors
   if not curses.has_colors():
@@ -210,6 +212,7 @@ def draw_menu(stdscr: curses.window):
   process_manager = powerSaver.ProcessManager(False)
   service_manager = powerSaver.ServiceManager("sysvinit", False)
   module_manager  = powerSaver.ModuleManager(False)
+  power_stats     = powerSaver.PowerStats(refresh)
 
   first_run = True
   while k != ord('q'):
@@ -239,6 +242,7 @@ def draw_menu(stdscr: curses.window):
       last_update = now
       process_manager.update_processes_information()
       module_manager.update_modules_list()
+      power_stats.refresh_status()
 
       skip = False
     # elif k == curses.KEY_RIGHT:
@@ -257,6 +261,29 @@ def draw_menu(stdscr: curses.window):
     # Strings
     title = f"powerSaver v{version}"[:width-1]
     status_msg = f"refresh rate -({refresh}s)+ | cursor: {cursor_y}"[:width-1]
+
+    # Power Stats
+    battery_status, battery_percent, battery_watts, battery_h, battery_m = power_stats.get_current_stats()
+    power_status_msg = f"Battery: {battery_percent:5.1f}% {battery_status.value}"
+    if battery_watts > 0.0 and battery_status in [powerSaver.BatteryStatus.CHARGING,
+                                                  powerSaver.BatteryStatus.DISCHARGING]:
+      power_status_msg += f" | {battery_watts:5.2f}W ({battery_h:2d}:{battery_m:02d}) "
+    if battery_status == powerSaver.BatteryStatus.DISCHARGING:
+      power_load = power_stats.get_power_load()
+      if power_load is not None:
+        battery_w_1min, battery_w_5min, battery_w_15min =  power_load
+        power_status_msg_len = len(power_status_msg) + 3
+        power_status_msg += f" | {battery_w_1min:5.2f}W {battery_w_5min:5.2f}W {battery_w_15min:5.2f}W"
+        status_msg_space = " " * (power_status_msg_len - len(status_msg))
+        time_est = power_stats.get_time_estimate_seconds()
+        if time_est is not None:
+          h_1min = math.floor(time_est[0] / 3600.0)
+          m_1min = round(time_est[0] / 60.0 - (h_1min * 60))
+          h_5min = math.floor(time_est[1] / 3600.0)
+          m_5min = round(time_est[1] / 60.0 - (h_5min * 60))
+          h_15min = math.floor(time_est[2] / 3600.0)
+          m_15min = round(time_est[2] / 60.0 - (h_15min * 60))
+          status_msg += f"{status_msg_space}{h_1min:02d}:{m_1min:02d}  {h_5min:02d}:{m_5min:02d}  {h_15min:02d}:{m_15min:02d}"
 
     max_len = len(title)
     no_proc = 0
@@ -415,6 +442,7 @@ def draw_menu(stdscr: curses.window):
       if len(error_msg) > 0:
         status_msg = f"{status} | {error_msg}"[:width-1]
       stdscr.addstr(height - 1, 0, status_msg)
+      stdscr.addstr(height - 2, 0, power_status_msg)
 
       # Refresh the screen
       stdscr.refresh()
