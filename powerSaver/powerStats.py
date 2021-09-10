@@ -121,6 +121,18 @@ class PowerStats(object):
         return round((self.charge_now / self.current_now)  * 3600.0), 0, 0
     return None
 
+  def get_time_estimate_h_min(self) -> Optional[Tuple[int, int, int, int, int, int]]:
+    time_estimate_seconds = self.get_time_estimate_seconds()
+    if time_estimate_seconds is None:
+      return None
+    h_1min = math.floor(time_estimate_seconds[0] / 3600.0)
+    m_1min = round(time_estimate_seconds[0] / 60.0 - (h_1min * 60))
+    h_5min = math.floor(time_estimate_seconds[1] / 3600.0)
+    m_5min = round(time_estimate_seconds[1] / 60.0 - (h_5min * 60))
+    h_15min = math.floor(time_estimate_seconds[2] / 3600.0)
+    m_15min = round(time_estimate_seconds[2] / 60.0 - (h_15min * 60))
+    return h_1min, m_1min, h_5min, m_5min, h_15min, m_15min
+
   def get_current_stats(self) -> Tuple[BatteryStatus, float, float, int, int]:
     power = self.voltage_now * self.current_now
     if self.battery_status == BatteryStatus.DISCHARGING and self.current_now > 0.0:
@@ -144,15 +156,10 @@ def update_thread(p_s: PowerStats, print_data: bool = False):
       print(f"Points: {len(p_s.power_usage)} Status: {p_s.battery_status}")
       power    = p_s.get_power_load()
       if power is not None:
-        time_est = p_s.get_time_estimate_seconds()
+        time_est = p_s.get_time_estimate_h_min()
         if time_est is not None:
           output  = f"{power[0]:5.2f}W {power[1]:5.2f}W {power[2]:5.2f}W\n"
-          h_1min  = math.floor(time_est[0] / 3600.0)
-          m_1min  = round(time_est[0] / 60.0 - (h_1min * 60))
-          h_5min  = math.floor(time_est[1] / 3600.0)
-          m_5min  = round(time_est[1] / 60.0 - (h_5min * 60))
-          h_15min = math.floor(time_est[2] / 3600.0)
-          m_15min = round(time_est[2] / 60.0 - (h_15min * 60))
+          h_1min, m_1min, h_5min, m_5min, h_15min, m_15min = time_est
           output += f"{h_1min:02d}:{m_1min:02d}  {h_5min:02d}:{m_5min:02d}  {h_15min:02d}:{m_15min:02d}\n"
           print(output)
     sleep(p_s.refresh)

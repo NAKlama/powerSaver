@@ -275,15 +275,13 @@ def draw_menu(stdscr: curses.window):
         power_status_msg_len = len(power_status_msg) + 3
         power_status_msg += f" | {battery_w_1min:5.2f}W {battery_w_5min:5.2f}W {battery_w_15min:5.2f}W"
         status_msg_space = " " * (power_status_msg_len - len(status_msg))
-        time_est = power_stats.get_time_estimate_seconds()
+        time_est = power_stats.get_time_estimate_h_min()
         if time_est is not None:
-          h_1min = math.floor(time_est[0] / 3600.0)
-          m_1min = round(time_est[0] / 60.0 - (h_1min * 60))
-          h_5min = math.floor(time_est[1] / 3600.0)
-          m_5min = round(time_est[1] / 60.0 - (h_5min * 60))
-          h_15min = math.floor(time_est[2] / 3600.0)
-          m_15min = round(time_est[2] / 60.0 - (h_15min * 60))
-          status_msg += f"{status_msg_space}{h_1min:02d}:{m_1min:02d}  {h_5min:02d}:{m_5min:02d}  {h_15min:02d}:{m_15min:02d}"
+          h_1min, m_1min, h_5min, m_5min, h_15min, m_15min = time_est
+          status_msg += f"{status_msg_space}" \
+                        f"{h_1min:02d}:{m_1min:02d}  " \
+                        f"{h_5min:02d}:{m_5min:02d}  " \
+                        f"{h_15min:02d}:{m_15min:02d}"
 
     max_len = len(title)
     no_proc = 0
