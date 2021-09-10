@@ -23,20 +23,16 @@ from typing import Dict, List, Tuple, Set
 
 import psutil
 
-_signal_processes_table = []
-for c in string.ascii_letters:
-  _signal_processes_table.append(c)
-for c in string.digits:
-  _signal_processes_table.append(c)
-for c in "_.-+/":
-  _signal_processes_table.append(c)
+_valid_process_name_characters  = string.ascii_letters
+_valid_process_name_characters += string.digits
+_valid_process_name_characters += "_.-+/"
 
 
 def sanitize_process_name(name: str) -> str:
   output = ""
-  for c in name:
-    if c in _signal_processes_table:
-      output += c
+  for character in name:
+    if character in _valid_process_name_characters:
+      output += character
   return output
 
 
