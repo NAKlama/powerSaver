@@ -16,7 +16,6 @@
 
 import subprocess
 import string
-from collections import defaultdict
 from copy import copy
 from datetime import datetime
 from enum import Enum
