@@ -22,8 +22,7 @@ from typing import Tuple, List, Dict, Union
 
 import powerSaver
 
-version = "1.0"
-sleep_time = 0.1
+version = "1.1"
 
 # noinspection SpellCheckingInspection
 processes: List[Dict[str, Union[str, List[str], powerSaver.ProcessStatus]]] = [
