@@ -25,7 +25,7 @@ import powerSaver
 version = "1.0"
 sleep_time = 0.1
 
-
+# noinspection SpellCheckingInspection
 processes: List[Dict[str, Union[str, List[str], powerSaver.ProcessStatus]]] = [
   {'title': "Chrome",
    'name':  ["chrome"]},
@@ -43,12 +43,13 @@ processes: List[Dict[str, Union[str, List[str], powerSaver.ProcessStatus]]] = [
    'cmdline': "CLion"},
   {'title': "LibreOffice",
    'name': ["soffice.bin"]},
-  {'title': "Pulse Audion Volume Control",
+  {'title': "Pulse Audio Volume Control",
    'name': ["pavucontrol"]},
   {'title': "Zen Monitor",
    'name': ["zenmonitor"]},
 ]
 
+# noinspection SpellCheckingInspection
 services: List[Dict[str, Union[str, List[str], powerSaver.ServiceStatus]]] = [
   {'title': "Bluetooth",
    'name':  "bluetooth",
@@ -69,6 +70,7 @@ services: List[Dict[str, Union[str, List[str], powerSaver.ServiceStatus]]] = [
    'needs-modules': ['cdc_ether', 'r8152']},
 ]
 
+# noinspection SpellCheckingInspection
 modules: List[Dict[str, Union[str, List[str], powerSaver.ModuleStatus]]] = [
   {'title': "Bluetooth",
    'usage-modules': ['uhid', 'hidp'],
