@@ -23,7 +23,7 @@ from typing import Tuple
 import powerSaver
 from config import processes, services, modules
 
-version = "1.1"
+version = "1.1.0"
 
 
 def process_color(status: powerSaver.ProcessStatus) -> Tuple[int, int]:
