@@ -86,11 +86,11 @@ class ServiceManager(object):
     return self.functions["toggle_service"](name, self.sudo)
 
   @staticmethod
-  def _unimplemented_function(a1 = None, a2 = None, a3 = None, a4 = None):
+  def _unimplemented_function(*_):
     raise ServiceStatusFunctionUnimplemented
 
   @staticmethod
-  def __create_precommand(name: str, sudo: bool) -> Optional[List[str]]:
+  def __create_service_command(name: str, sudo: bool) -> Optional[List[str]]:
     command = []
     if sudo:
       command.append("sudo")
@@ -102,7 +102,7 @@ class ServiceManager(object):
 
   @staticmethod
   def _get_status_init(name: str, sudo: bool) -> ServiceStatus:
-    command = ServiceManager.__create_precommand(name, sudo)
+    command = ServiceManager.__create_service_command(name, sudo)
     if command is None:
       return ServiceStatus.NOT_FOUND
     command.append("status")
@@ -133,7 +133,7 @@ class ServiceManager(object):
 
   @staticmethod
   def _start_service_init(name: str, sudo: bool) -> bool:
-    command = ServiceManager.__create_precommand(name, sudo)
+    command = ServiceManager.__create_service_command(name, sudo)
     if command is None:
       return False
 
@@ -153,7 +153,7 @@ class ServiceManager(object):
 
   @staticmethod
   def _stop_service_init(name: str, sudo: bool) -> bool:
-    command = ServiceManager.__create_precommand(name, sudo)
+    command = ServiceManager.__create_service_command(name, sudo)
     if command is None:
       return False
 
@@ -179,4 +179,3 @@ class ServiceManager(object):
     elif status == ServiceStatus.RUNNING:
       return ServiceManager._stop_service_init(name, sudo)
     return False
-

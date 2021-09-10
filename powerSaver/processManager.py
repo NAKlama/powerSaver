@@ -40,7 +40,6 @@ def sanitize_process_name(name: str) -> str:
   return output
 
 
-
 class ProcessStatus(Enum):
   RUNNING = 0
   STOPPED = 1
