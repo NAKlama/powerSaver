@@ -43,9 +43,9 @@ class PowerStats(object):
   current_now: float = 0.0
   working: bool
 
-  def __init__(self, refresh: int = 5):
+  def __init__(self, refresh: int = 5, battery_path: str = "/sys/class/power_supply/BAT0"):
     self.working = True
-    self.battery_path = Path("/sys/class/power_supply/BAT0")
+    self.battery_path = Path(battery_path)
     self.refresh = refresh
     self.power_usage = []
     if self.battery_path.is_dir():

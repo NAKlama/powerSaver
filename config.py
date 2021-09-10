@@ -3,7 +3,48 @@ from typing import List, Dict, Union
 
 import powerSaver
 
+# Debugging on or off
+DEBUG = False
+# DEBUG = True
 
+# Shall we call commands using sudo?
+USE_SUDO = False
+
+# What init system are we running
+# Valid options: OpenRC
+# Planned options: systemd
+INIT_SYSTEM = "OpenRC"
+
+# How often to query process and service status, and update menu
+DEFAULT_REFRESH_RATE = 5
+
+# How often to query power data while discharging or charging
+DEFAULT_POWER_SAMPLING_RATE = 5
+
+# The maximum value the previous ones can be set during runtime
+REFRESH_MAXIMUM = 15
+
+# The path pointing to your battery information
+SYS_CLASS_BATTERY_PATH = "/sys/class/power_supply/BAT0"
+
+# Thresholds for battery percentage color
+#  Red if below [0]
+#  Yellow if below [1]
+#  Green if below [2]
+#  Cyan if below [2] but below 100.0
+BATTERY_COLOR_LEVELS = [15.0, 60.0, 95.0]
+
+# Thresholds for battery charge / discharge colors
+#  Cyan up to [0]
+#  Green up to [1]
+#  Yellow up to [2]
+#  Red up to [3]
+#  Magenta above [3]
+POWER_COLOR_LEVELS = [5.0, 8.0, 14.0, 20.0]
+
+
+# A list of processes to monitor and send STOP and CONT signals to
+#
 # noinspection SpellCheckingInspection
 processes: List[Dict[str, Union[str, List[str], powerSaver.ProcessStatus]]] = [
   {'title': "Chrome",
@@ -31,6 +72,8 @@ processes: List[Dict[str, Union[str, List[str], powerSaver.ProcessStatus]]] = [
    'name': ["zenmonitor"]},
 ]
 
+# A list of services to monitor and switch on/off
+#
 # noinspection SpellCheckingInspection
 services: List[Dict[str, Union[str, List[str], powerSaver.ServiceStatus]]] = [
   {'title': "Bluetooth",
@@ -52,6 +95,8 @@ services: List[Dict[str, Union[str, List[str], powerSaver.ServiceStatus]]] = [
    'needs-modules': ['cdc_ether', 'r8152']},
 ]
 
+# A list of modules to monitor and load/unload
+#
 # noinspection SpellCheckingInspection
 modules: List[Dict[str, Union[str, List[str], powerSaver.ModuleStatus]]] = [
   {'title': "Bluetooth",

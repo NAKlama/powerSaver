@@ -48,8 +48,9 @@ class ServiceStatus(Enum):
 class ServiceManager(object):
   functions: Dict[str, Callable]
   sudo: bool
+  debug: bool
 
-  def __init__(self, init_type: str, sudo: bool = True):
+  def __init__(self, init_type: str, sudo: bool = False, debug: bool = False):
     function_db = {
       "sysvinit": {
         "get_status": ServiceManager._get_status_init,
@@ -64,17 +65,18 @@ class ServiceManager(object):
         "toggle_service": ServiceManager._unimplemented_function
       }
     }
-    corrected_type = init_type
-    if init_type in ['init', 'openrc']:
+    corrected_type = init_type.lower()
+    if init_type.lower() in ['init', 'openrc']:
       corrected_type = "sysvinit"
     if corrected_type in function_db:
       self.functions = function_db[corrected_type]
     else:
-      self.functions = function_db["systemd"]
+      self.functions = function_db["sysvinit"]
     self.sudo = sudo
+    self.debug = debug
 
   def get_status(self, name: str) -> ServiceStatus:
-    return self.functions["get_status"](name, self.sudo)
+    return self.functions["get_status"](name, self.sudo, self.debug)
 
   def start_service(self, name: str) -> bool:
     return self.functions["start_service"](name, self.sudo)
@@ -97,11 +99,12 @@ class ServiceManager(object):
     script = "/etc/init.d/" + name
     if not is_exe(script):
       return None
-    command.append(script)
+    command.append("/sbin/rc-service")
+    command.append(name)
     return command
 
   @staticmethod
-  def _get_status_init(name: str, sudo: bool) -> ServiceStatus:
+  def _get_status_init(name: str, sudo: bool, debug: bool) -> ServiceStatus:
     command = ServiceManager.__create_service_command(name, sudo)
     if command is None:
       return ServiceStatus.NOT_FOUND
@@ -109,7 +112,9 @@ class ServiceManager(object):
 
     status_result = subprocess.run(command, capture_output=True)
     status_output = status_result.stdout.decode()
+    status_output += status_result.stderr.decode()
 
+    status = None
     match = sysvinit_status_parser.match(status_output)
     if match:
       status = match.group(1)
@@ -119,6 +124,13 @@ class ServiceManager(object):
         return ServiceStatus.STOPPED
       if status == "crashed":
         return ServiceStatus.CRASHED
+      if status == "stopping":
+        return ServiceStatus.TOGGLED
+
+    if debug:
+      with open('.error_status', 'ab') as outF:
+        err_str = f"{name}: [{status_result.returncode}] {status_output} -> {status}\n"
+        os.write(outF.fileno(), err_str.encode())
 
     return ServiceStatus.UNKNOWN
 
