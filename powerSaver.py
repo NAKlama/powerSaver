@@ -26,7 +26,7 @@ import powerSaver
 
 
 application_name = "powerSaver"
-version = "1.2.0"
+version = "1.2.1"
 
 
 def process_color(status: powerSaver.ProcessStatus) -> Tuple[int, int]:
@@ -531,14 +531,14 @@ def draw_menu(std_screen: curses.window):
             power_status_msg += [(f"{power_status_msg_space} | ", curses.A_NORMAL),
                                  (f"{battery_w_1min:5.2f}", power_use_color(battery_w_1min)),
                                  ("W ", curses.A_NORMAL),
-                                 ("{battery_w_5min:5.2f}", power_use_color(battery_w_5min)),
+                                 (f"{battery_w_5min:5.2f}", power_use_color(battery_w_5min)),
                                  ("W ", curses.A_NORMAL),
-                                 ("{battery_w_15min:5.2f}", power_use_color(battery_w_15min)),
+                                 (f"{battery_w_15min:5.2f}", power_use_color(battery_w_15min)),
                                  ("W", curses.A_NORMAL)]
             time_est = power_stats.get_time_estimate_h_min()
             if time_est is not None:
               h_1min, m_1min, h_5min, m_5min, h_15min, m_15min = time_est
-              status_msg += f"{status_msg_space} | " \
+              status_msg += f"{status_msg_space} |  " \
                             f"{h_1min:02d}:{m_1min:02d}  " \
                             f"{h_5min:02d}:{m_5min:02d}  " \
                             f"{h_15min:02d}:{m_15min:02d}"
