@@ -26,7 +26,7 @@ import powerSaver
 
 
 application_name = "powerSaver"
-version = "1.2.1"
+version = "1.2.2"
 
 
 def process_color(status: powerSaver.ProcessStatus) -> Tuple[int, int]:
@@ -54,6 +54,8 @@ def service_color(status: powerSaver.ServiceStatus) -> Tuple[int, int]:
     return 8, curses.A_NORMAL  # Magenta
   if status == powerSaver.ServiceStatus.NO_MODULES:
     return 7, curses.A_NORMAL  # Blue
+  if status == powerSaver.ServiceStatus.INACTIVE:
+    return 6, curses.A_NORMAL  # Cyan
   return 17, curses.A_NORMAL   # Black on Red
 
 
@@ -414,7 +416,7 @@ def draw_menu(std_screen: curses.window):
           if status in [powerSaver.ServiceStatus.STOPPED, powerSaver.ServiceStatus.CRASHED]:
             future = process_pool.submit(execute_service_thread, service_manager, services[cursor]["name"], False)
             execute_futures.append(future)
-          elif status == powerSaver.ServiceStatus.RUNNING:
+          elif status in [powerSaver.ServiceStatus.RUNNING, powerSaver.ServiceStatus.INACTIVE]:
             future = process_pool.submit(execute_service_thread, service_manager, services[cursor]["name"], True)
             execute_futures.append(future)
         elif cursor_y - len(active_processes) - len(services) < len(modules):  # Modules

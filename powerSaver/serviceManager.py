@@ -41,6 +41,7 @@ class ServiceStatus(Enum):
   CRASHED     = "crashed"
   NOT_FOUND   = "service not found"
   NO_MODULES  = "no modules"
+  INACTIVE    = "inactive"
   UNKNOWN     = "unknown"
   TOGGLED     = "toggled"
 
@@ -126,6 +127,10 @@ class ServiceManager(object):
         return ServiceStatus.CRASHED
       if status == "stopping":
         return ServiceStatus.TOGGLED
+      if status == "inactive":
+        return ServiceStatus.INACTIVE
+      if status == "starting":
+        return ServiceStatus.TOGGLED
 
     if debug:
       with open('.error_service', 'ab') as outF:
@@ -149,8 +154,8 @@ class ServiceManager(object):
     if command is None:
       return False
 
-    status = ServiceManager._get_status_init(name, sudo)
-    if status == ServiceStatus.RUNNING:
+    status = ServiceManager._get_status_init(name, sudo, debug)
+    if status in [ServiceStatus.RUNNING, ServiceStatus.INACTIVE]:
       return True
     elif ServiceManager.__zap_if_crashed(status, command):
       pass
@@ -179,7 +184,7 @@ class ServiceManager(object):
       return True
     if ServiceManager.__zap_if_crashed(status, command):
       return True
-    elif status != ServiceStatus.RUNNING:
+    elif status not in [ServiceStatus.RUNNING, ServiceStatus.INACTIVE]:
       return False
 
     command.append("stop")
