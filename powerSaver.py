@@ -225,6 +225,8 @@ def cleanup_executive_futures(in_futures: List[concurrent.futures.Future]) -> Li
   for f in in_futures:
     if not f.done():
       output.append(f)
+    else:
+      f.result()
   return output
 
 
@@ -374,6 +376,7 @@ def draw_menu(std_screen: curses.window):
 
         if first_loop:
           processes, active_processes, services, modules, max_len = update_menu_structure_future.result()
+      if not skip_calculate_menu or k in [curses.KEY_UP, curses.KEY_DOWN]:
         not_found = 0
         for y, s in enumerate(services):
           if s["status"] in [powerSaver.ServiceStatus.NOT_FOUND, powerSaver.ServiceStatus.NO_MODULES]:
@@ -382,7 +385,7 @@ def draw_menu(std_screen: curses.window):
               if k == curses.KEY_UP:
                 cursor_y -= not_found
               else:
-                cursor_y += 1
+                cursor_y += not_found
           else:
             not_found = 0
 
@@ -391,9 +394,10 @@ def draw_menu(std_screen: curses.window):
 
       # Execute action
       error_msg = ""
+      section   = ""
       if toggle:
-
         if cursor_y < len(active_processes):  # Processes
+          section = "Processes->" + active_processes[cursor_y]["title"]
           status = active_processes[cursor_y]["status"]
           for name in active_processes[cursor_y]["name"]:
             cmdline_filter = None
@@ -405,6 +409,7 @@ def draw_menu(std_screen: curses.window):
               process_manager.signal_processes(name, cmdline_filter, True)
         elif cursor_y - len(active_processes) < len(services):  # Services
           cursor = cursor_y - len(active_processes)
+          section = "Services->" + services[cursor]["title"]
           status = services[cursor]["status"]
           if status in [powerSaver.ServiceStatus.STOPPED, powerSaver.ServiceStatus.CRASHED]:
             future = process_pool.submit(execute_service_thread, service_manager, services[cursor]["name"], False)
@@ -414,6 +419,7 @@ def draw_menu(std_screen: curses.window):
             execute_futures.append(future)
         elif cursor_y - len(active_processes) - len(services) < len(modules):  # Modules
           cursor = cursor_y - len(active_processes) - len(services)
+          section = "Modules->" + modules[cursor]["title"]
           status = modules[cursor]["status"]
           if status in [powerSaver.ModuleStatus.LOADED, powerSaver.ModuleStatus.PARTIAL]:
             for module in reversed(modules[cursor]["modules"]):
@@ -503,6 +509,8 @@ def draw_menu(std_screen: curses.window):
                           curses.color_pair(4)),
                          (" | ", curses.A_NORMAL),
                          (f"k: {k}", curses.color_pair(6)),
+                         (" | ", curses.A_NORMAL),
+                         (f"{section}", curses.color_pair(8))
                          ]
           # len(active_processes) + len(services) + len(modules) - 1
 

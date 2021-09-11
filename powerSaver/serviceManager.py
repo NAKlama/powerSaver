@@ -79,10 +79,10 @@ class ServiceManager(object):
     return self.functions["get_status"](name, self.sudo, self.debug)
 
   def start_service(self, name: str) -> bool:
-    return self.functions["start_service"](name, self.sudo)
+    return self.functions["start_service"](name, self.sudo, self.debug)
 
   def stop_service(self, name: str) -> bool:
-    return self.functions["stop_service"](name, self.sudo)
+    return self.functions["stop_service"](name, self.sudo, self.debug)
 
   def toggle_service(self, name: str) -> bool:
     return self.functions["toggle_service"](name, self.sudo)
@@ -92,7 +92,7 @@ class ServiceManager(object):
     raise ServiceStatusFunctionUnimplemented
 
   @staticmethod
-  def __create_service_command(name: str, sudo: bool) -> Optional[List[str]]:
+  def __create_service_command_init(name: str, sudo: bool) -> Optional[List[str]]:
     command = []
     if sudo:
       command.append("sudo")
@@ -105,7 +105,7 @@ class ServiceManager(object):
 
   @staticmethod
   def _get_status_init(name: str, sudo: bool, debug: bool) -> ServiceStatus:
-    command = ServiceManager.__create_service_command(name, sudo)
+    command = ServiceManager.__create_service_command_init(name, sudo)
     if command is None:
       return ServiceStatus.NOT_FOUND
     command.append("status")
@@ -128,7 +128,7 @@ class ServiceManager(object):
         return ServiceStatus.TOGGLED
 
     if debug:
-      with open('.error_status', 'ab') as outF:
+      with open('.error_service', 'ab') as outF:
         err_str = f"{name}: [{status_result.returncode}] {status_output} -> {status}\n"
         os.write(outF.fileno(), err_str.encode())
 
@@ -144,8 +144,8 @@ class ServiceManager(object):
     return False
 
   @staticmethod
-  def _start_service_init(name: str, sudo: bool) -> bool:
-    command = ServiceManager.__create_service_command(name, sudo)
+  def _start_service_init(name: str, sudo: bool, debug: bool) -> bool:
+    command = ServiceManager.__create_service_command_init(name, sudo)
     if command is None:
       return False
 
@@ -160,16 +160,21 @@ class ServiceManager(object):
     command.append("start")
     run_result = subprocess.run(command, capture_output=True)
     if run_result.returncode != 0:
+      if debug:
+        with open('.error_service', 'ab') as outF:
+          err_str = f"{name}: [{run_result.returncode}] {status}\n" \
+                    f"{run_result.stdout.decode() + run_result.stderr.decode()}"
+          os.write(outF.fileno(), err_str.encode())
       return False
     return True
 
   @staticmethod
-  def _stop_service_init(name: str, sudo: bool) -> bool:
-    command = ServiceManager.__create_service_command(name, sudo)
+  def _stop_service_init(name: str, sudo: bool, debug: bool) -> bool:
+    command = ServiceManager.__create_service_command_init(name, sudo)
     if command is None:
       return False
 
-    status = ServiceManager._get_status_init(name, sudo)
+    status = ServiceManager._get_status_init(name, sudo, debug)
     if status == ServiceStatus.STOPPED:
       return True
     if ServiceManager.__zap_if_crashed(status, command):
