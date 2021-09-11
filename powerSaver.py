@@ -26,7 +26,7 @@ import powerSaver
 
 
 application_name = "powerSaver"
-version = "1.2.2"
+version = "1.2.3"
 
 
 def process_color(status: powerSaver.ProcessStatus) -> Tuple[int, int]:
@@ -362,9 +362,11 @@ def draw_menu(std_screen: curses.window):
         skip_render_power   = False
         skip_calculate_menu = False
 
+      if k in [ord('+'), ord('-'), ord(','), ord('.')]:
+        refresh                       = max(1, min(refresh, REFRESH_MAXIMUM))
+        power_sampling_rate           = max(1, min(power_sampling_rate, REFRESH_MAXIMUM))
+        effective_power_sampling_rate = max(1, min(effective_power_sampling_rate, REFRESH_MAXIMUM))
       if k > 0:
-        refresh = max(1, min(refresh, REFRESH_MAXIMUM))
-        power_sampling_rate = max(1, min(power_sampling_rate, REFRESH_MAXIMUM))
         skip_render_menu = False
 
       if not skip_calculate_menu:
@@ -434,13 +436,6 @@ def draw_menu(std_screen: curses.window):
             for module in modules[cursor]["modules"]:
               module_manager.load_module(module)
 
-      # now = datetime.now()
-      # sleep_length_display = last_update_display + timedelta(seconds=refresh) - now
-      # sleep_length_power   = last_update_power + timedelta(seconds=power_sampling_rate) - now
-      # sleep_length = min(sleep_length_power, sleep_length_display)
-      # sleep_length = math.floor(max(0.0, sleep_length.total_seconds()) * 1000)
-      # error_msg += f" D={sleep_length_display} P={sleep_length_power} Total={sleep_length/1000.0}"
-
       if (not skip_render_menu) or (not skip_render_power):
         std_screen.clear()
 
@@ -491,7 +486,7 @@ def draw_menu(std_screen: curses.window):
         if battery_status == powerSaver.BatteryStatus.DISCHARGING:
           effective_power_sampling_rate = power_sampling_rate
         else:
-          effective_power_sampling_rate = refresh
+          effective_power_sampling_rate = max(refresh, power_sampling_rate)
 
         status_msg = powerSaver.FormattedMessage()
         status_msg += [("Q", curses.A_BOLD),
@@ -566,7 +561,7 @@ def draw_menu(std_screen: curses.window):
       # calculate sleep length
       now = datetime.now()
       sleep_length_display = last_update_display + timedelta(seconds=refresh) - now
-      sleep_length_power = last_update_power + timedelta(seconds=power_sampling_rate) - now
+      sleep_length_power = last_update_power + timedelta(seconds=effectiv_power_sampling_rate) - now
       sleep_length = min(sleep_length_power, sleep_length_display)
       sleep_length = math.floor(max(0.0, sleep_length.total_seconds() * 1000))
 
