@@ -26,7 +26,7 @@ import powerSaver
 
 
 application_name = "powerSaver"
-version = "1.2.3"
+version = "1.2.4"
 
 
 def process_color(status: powerSaver.ProcessStatus) -> Tuple[int, int]:
@@ -561,7 +561,7 @@ def draw_menu(std_screen: curses.window):
       # calculate sleep length
       now = datetime.now()
       sleep_length_display = last_update_display + timedelta(seconds=refresh) - now
-      sleep_length_power = last_update_power + timedelta(seconds=effectiv_power_sampling_rate) - now
+      sleep_length_power = last_update_power + timedelta(seconds=effective_power_sampling_rate) - now
       sleep_length = min(sleep_length_power, sleep_length_display)
       sleep_length = math.floor(max(0.0, sleep_length.total_seconds() * 1000))
 
