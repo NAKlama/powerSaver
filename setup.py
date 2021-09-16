@@ -24,6 +24,7 @@ setup(
     author="Nina Alexandra Klama",
     author_email="gitlab@fklama.de",
     install_requires=[
-        'psutil'
+        'psutil',
+        'PyYAML',
     ],
 )

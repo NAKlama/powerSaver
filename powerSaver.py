@@ -20,13 +20,17 @@ import math
 import select
 import sys
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Tuple, List, Dict, Union, Optional
 
 import powerSaver
-
+from powerSaver.config_parser import ConfigParser
 
 application_name = "powerSaver"
-version = "1.2.4"
+version = "1.2.5"
+default_config_file = 'config.yaml'
+
+config = ConfigParser(Path(default_config_file))
 
 
 def process_color(status: powerSaver.ProcessStatus) -> Tuple[int, int]:
@@ -110,8 +114,7 @@ def get_processes_length(processes: List[Dict[str, Union[str, List[str], powerSa
 
 
 def battery_percent_color(battery_percent: float) -> int:
-  from config import BATTERY_COLOR_LEVELS
-  low, mid, high = BATTERY_COLOR_LEVELS
+  low, mid, high = config.battery_colors()
   if battery_percent < low:
     return curses.color_pair(5)  # Red
   elif battery_percent < mid:
@@ -125,8 +128,7 @@ def battery_percent_color(battery_percent: float) -> int:
 
 
 def power_use_color(battery_watts: float) -> int:
-  from config import POWER_COLOR_LEVELS
-  very_low, low, mid, high = POWER_COLOR_LEVELS
+  very_low, low, mid, high = config.power_colors()
   if battery_watts > high:
     return curses.color_pair(8)  # Magenta
   elif battery_watts > mid:
@@ -233,16 +235,18 @@ def cleanup_executive_futures(in_futures: List[concurrent.futures.Future]) -> Li
 
 
 def draw_menu(std_screen: curses.window):
-  from config import processes, services, modules, DEBUG, DEFAULT_POWER_SAMPLING_RATE, \
-    DEFAULT_REFRESH_RATE, USE_SUDO, REFRESH_MAXIMUM, SYS_CLASS_BATTERY_PATH, INIT_SYSTEM
-
   poll_object = select.poll()
   poll_object.register(sys.stdin, select.POLLIN)
 
+  default_refresh_rate, default_power_sampling_rate, refresh_maximum = config.refresh()
+  processes = config.processes()
+  services  = config.services()
+  modules   = config.modules()
+
   k = 0
   cursor_y            = 0
-  refresh             = DEFAULT_REFRESH_RATE
-  power_sampling_rate = DEFAULT_POWER_SAMPLING_RATE
+  refresh             = default_refresh_rate
+  power_sampling_rate = default_power_sampling_rate
 
   effective_power_sampling_rate = power_sampling_rate
 
@@ -297,10 +301,10 @@ def draw_menu(std_screen: curses.window):
     curses.init_pair(17, curses.COLOR_BLACK, curses.COLOR_RED)
     curses.init_pair(17+8, curses.COLOR_BLUE, curses.COLOR_RED)
 
-    process_manager = powerSaver.ProcessManager(USE_SUDO)
-    service_manager = powerSaver.ServiceManager(INIT_SYSTEM, USE_SUDO, DEBUG)
-    module_manager  = powerSaver.ModuleManager(USE_SUDO)
-    power_stats     = powerSaver.PowerStats(refresh, SYS_CLASS_BATTERY_PATH)
+    process_manager = powerSaver.ProcessManager(config.use_sudo())
+    service_manager = powerSaver.ServiceManager(config.init_system(), config.use_sudo(), config.debug())
+    module_manager  = powerSaver.ModuleManager(config.use_sudo())
+    power_stats     = powerSaver.PowerStats(refresh, config.power_sys_class_path())
 
     height, width = std_screen.getmaxyx()
     title = f"{application_name} v{version}"
@@ -363,9 +367,9 @@ def draw_menu(std_screen: curses.window):
         skip_calculate_menu = False
 
       if k in [ord('+'), ord('-'), ord(','), ord('.')]:
-        refresh                       = max(1, min(refresh, REFRESH_MAXIMUM))
-        power_sampling_rate           = max(1, min(power_sampling_rate, REFRESH_MAXIMUM))
-        effective_power_sampling_rate = max(1, min(effective_power_sampling_rate, REFRESH_MAXIMUM))
+        refresh                       = max(1, min(refresh, refresh_maximum))
+        power_sampling_rate           = max(1, min(power_sampling_rate, refresh_maximum))
+        effective_power_sampling_rate = max(1, min(effective_power_sampling_rate, refresh_maximum))
       if k > 0:
         skip_render_menu = False
 
@@ -500,7 +504,7 @@ def draw_menu(std_screen: curses.window):
                          (",", curses.A_BOLD),
                          (f"[{power_sampling_rate}s]", curses.A_NORMAL),
                          (".", curses.A_BOLD)]
-        if DEBUG:
+        if config.debug():
           status_msg += [(" | ", curses.A_NORMAL),
                          (f"cursor: {cursor_y}/{len(active_processes) + len(services) + len(modules) - 1}",
                           curses.color_pair(4)),

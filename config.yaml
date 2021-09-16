@@ -1,0 +1,99 @@
+debug: false
+use_sudo: false
+init_system: "OpenRC"
+
+refresh:
+  default: 5
+  power_default: 5
+  maximum: 15
+
+power:
+  sys_class_path: "/sys/class/power_supply/BAT0"
+  colors:
+    battery:
+      - 15.0
+      - 60.0
+      - 95.0
+    power:
+      - 5.0
+      - 8.0
+      - 14.0
+      - 20.0
+
+processes:
+  - title: Chrome
+    name:
+      - chrome
+  - title: Qutebrowser
+    name:
+      - qutebrowser
+      - QtWebEngineProcess
+  - title: Discord
+    name:
+      - Discord
+  - title: JetBrains Toolbox
+    name:
+      - jetbrains-toolbox
+  - title: PyCharm
+    name:
+      - java
+    cmdline: PyCharm
+  - title: CLion
+    name:
+      - java
+    cmdline: CLion
+  - title: DataGrip
+    name:
+      - java
+    cmdline: datagrip
+  - title: LibreOffice
+    name:
+      - soffice.bin
+  - title: Pulse Audio Volume Contro
+    name:
+      - pavucontrol
+  - title: Zen Monitor
+    name:
+      - zenmonitor
+
+services:
+  - title: Bluetooth
+    name: bluetooth
+    needs-modules:
+      - uhid
+      - hidp
+  - title: Docker
+    name: docker
+  - title: sshd
+    name: sshd
+  - title: Mosquitto
+    name: mosquitto
+  - title: WiFi
+    name: net.wlo1
+    needs-modules:
+      - iwlmvm
+  - title: Ethernet (Builtin)
+    name: net.enp2s0
+  - title: Ethernet (eth0)
+    name: net.eth0
+    needs-modules:
+      - cdc_ether
+      - r8152
+
+modules:
+  - title: Bluetooth
+    usage-modules:
+      - uhid
+      - hidp
+    modules: ['btintel', 'btbcm', 'btrtl', 'btusb', 'hidp', 'uhid']
+    service: bluetooth
+  - title: WiFi
+    usage-modules:
+      - iwlmvm
+    modules: ['iwlwifi', 'iwlmvm']
+    service: net.wlo1
+  - title: USB-Ethernet
+    usage-modules:
+      - cdc_ether
+      - r8152
+    modules: ['mii', 'r8152', 'usbnet', 'cdc_ether']
