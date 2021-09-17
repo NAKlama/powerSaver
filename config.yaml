@@ -55,6 +55,9 @@ processes:
   - title: Zen Monitor
     name:
       - zenmonitor
+  - title: Quimup
+    name:
+      - quimup
 
 services:
   - title: Bluetooth
@@ -66,6 +69,8 @@ services:
     name: docker
   - title: sshd
     name: sshd
+  - title: Music Player Daemon
+    name: mpd
   - title: Mosquitto
     name: mosquitto
   - title: WiFi

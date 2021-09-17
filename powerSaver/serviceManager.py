@@ -86,7 +86,7 @@ class ServiceManager(object):
     return self.functions["stop_service"](name, self.sudo, self.debug)
 
   def toggle_service(self, name: str) -> bool:
-    return self.functions["toggle_service"](name, self.sudo)
+    return self.functions["toggle_service"](name, self.sudo, self.debug)
 
   @staticmethod
   def _unimplemented_function(*_):
@@ -194,10 +194,10 @@ class ServiceManager(object):
     return True
 
   @staticmethod
-  def _toggle_service_init(name: str, sudo: bool) -> bool:
-    status = ServiceManager._get_status_init(name, sudo)
+  def _toggle_service_init(name: str, sudo: bool, debug: bool) -> bool:
+    status = ServiceManager._get_status_init(name, sudo, debug)
     if status in [ServiceStatus.STOPPED, ServiceStatus.CRASHED]:
-      return ServiceManager._start_service_init(name, sudo)
+      return ServiceManager._start_service_init(name, sudo, debug)
     elif status == ServiceStatus.RUNNING:
-      return ServiceManager._stop_service_init(name, sudo)
+      return ServiceManager._stop_service_init(name, sudo, debug)
     return False

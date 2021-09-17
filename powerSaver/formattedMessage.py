@@ -29,7 +29,7 @@ class FormattedMessage:
       for m in msg.message:
         self.message.append(m)
     else:
-      FormattedMessageAppendDatatypeError("Please only append the correct datatypes to a FormattedMessage\n"
+      FormattedMessageAppendDatatypeError("Please only append the correct data types to a FormattedMessage\n"
                                           "  These are a single: Union[List[Tuple[str, int]], Tuple[str, int], "
                                           "FormattedMessage]\n"
                                           "  Or these two: str, int")
@@ -64,7 +64,7 @@ class FormattedMessage:
     try:
       out.append_message(other.message)
     except FormattedMessageAppendDatatypeError:
-      raise FormattedMessageAppendDatatypeError("Please only append the correct datatypes to a FormattedMessage\n"
+      raise FormattedMessageAppendDatatypeError("Please only append the correct data types to a FormattedMessage\n"
                                                 "  These are: Union[List[Tuple[str, int]], Tuple[str, int], "
                                                 "FormattedMessage]")
     return out
@@ -74,7 +74,7 @@ class FormattedMessage:
     try:
       self.append_message(other)
     except FormattedMessageAppendDatatypeError:
-      raise FormattedMessageAppendDatatypeError("Please only append the correct datatypes to a FormattedMessage\n"
+      raise FormattedMessageAppendDatatypeError("Please only append the correct data types to a FormattedMessage\n"
                                                 "  These are: Union[List[Tuple[str, int]], Tuple[str, int], "
                                                 "FormattedMessage]")
     return self
