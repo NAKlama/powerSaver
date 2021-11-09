@@ -21,6 +21,8 @@ from enum import Enum
 from pathlib import Path
 from typing import List, Tuple, Optional
 
+import funcy as funcy
+
 
 class BatteryStatus(Enum):
   FULL        = " "
@@ -32,7 +34,7 @@ class BatteryStatus(Enum):
 class PowerStats(object):
   battery_path: Path
 
-  power_usage: List[float]
+  power_load: Tuple[float, float, float]
   refresh: int
   last_refresh: Optional[datetime] = None
   battery_status: BatteryStatus
@@ -43,11 +45,16 @@ class PowerStats(object):
   current_now: float = 0.0
   working: bool
 
+  load_constants: List[List[float]]  # load_constants[delta_t-1][x] x=0 => 1, x=1 => 5, x=2 => 15
+  load_constants_max: int
+
   def __init__(self, refresh: int = 5, battery_path: str = "/sys/class/power_supply/BAT0"):
+    self.load_constants = []
+    self.__calc_loadconstants(60)
     self.working = True
     self.battery_path = Path(battery_path)
     self.refresh = refresh
-    self.power_usage = []
+    self.power_load = (0.0, 0.0, 0.0)
     if self.battery_path.is_dir():
       self.refresh_status()
       with open(self.battery_path / "charge_full", 'r') as inF:
@@ -56,6 +63,19 @@ class PowerStats(object):
         self.charge_design = int(inF.readline().strip()) / 1e6
     else:
       self.working = False
+
+  @staticmethod
+  def calc_moving_average(in_data: Tuple[float, float, float]) -> float:
+    p, l, c = in_data
+    return (1.0 - c) * p + c * l
+
+  def __calc_loadconstants(self, maximum: int) -> None:
+    delta = maximum - len(self.load_constants)
+    self.load_constants_max = maximum
+    time_sec = [60.0, 300.0, 900.0]
+    for delta_t in range(len(self.load_constants), maximum):
+      time_const = funcy.lmap(lambda x: math.exp(-(delta_t + 1) / x), time_sec)
+      self.load_constants.append(time_const)
 
   def refresh_status(self):
     with open(self.battery_path / "status", 'r') as inF:
@@ -69,69 +89,55 @@ class PowerStats(object):
       else:
         self.battery_status = BatteryStatus.ERROR
     with open(self.battery_path / "charge_now", 'r') as inF:
-      self.charge_now = float(inF.readline().strip()) / 1e6
+      self.charge_now = float(inF.readline().strip()) / 1.0e6
     if self.battery_status in [BatteryStatus.CHARGING, BatteryStatus.DISCHARGING]:
       with open(self.battery_path / "voltage_now", 'r') as inF:
-        self.voltage_now = float(inF.readline().strip()) / 1e6
+        self.voltage_now = float(inF.readline().strip()) / 1.0e6
       with open(self.battery_path / "current_now", 'r') as inF:
-        self.current_now = float(inF.readline().strip()) / 1e6
+        self.current_now = float(inF.readline().strip()) / 1.0e6
+
+    power = self.voltage_now * self.current_now
 
     if self.battery_status == BatteryStatus.DISCHARGING:
       if self.last_refresh is None:
-        self.power_usage = []
+        self.power_load = (power, power, power)
         time_since_refresh = self.refresh
       else:
         time_since_refresh = int(round((datetime.now() - self.last_refresh).total_seconds()))
+
+      if time_since_refresh > self.load_constants_max:
+        self.__calc_loadconstants(time_since_refresh*2)
       self.last_refresh = datetime.now()
-      if len(self.power_usage) > 900 - time_since_refresh:
-        self.power_usage = self.power_usage[-900 - time_since_refresh:]
-      for i in range(time_since_refresh):
-        self.power_usage.append(self.voltage_now * self.current_now)
+
+      self.power_load = tuple(funcy.map(self.calc_moving_average,
+                                        zip((power, power, power),
+                                            self.power_load,
+                                            self.load_constants[time_since_refresh-1])))
     else:
-      self.power_usage = []
+      self.power_load = (0.0, 0.0, 0.0)
       self.last_refresh = None
 
-  def get_power_load(self) -> Optional[Tuple[float, float, float]]:
-    datapoints = len(self.power_usage)
-    if datapoints > 0:
-      datapoints_1min  = min(60, datapoints)
-      datapoints_5min  = min(300, datapoints)
-      datapoints_15min = min(900, datapoints)
-      power_1min  = sum(self.power_usage[datapoints - datapoints_1min:])  / datapoints_1min
-      power_5min  = sum(self.power_usage[datapoints - datapoints_5min:])  / datapoints_5min
-      power_15min = sum(self.power_usage) / datapoints_15min
-      return power_1min, power_5min, power_15min
-    elif self.battery_status == BatteryStatus.CHARGING:
+  def get_power_load(self) -> Tuple[float, float, float]:
+    if self.battery_status == BatteryStatus.CHARGING:
       return self.voltage_now * self.current_now, 0.0, 0.0
-    return None
+    else:
+      return self.power_load
 
   def get_time_estimate_seconds(self) -> Optional[Tuple[int, int, int]]:
     power_load = self.get_power_load()
-    if power_load is not None:
-      power_1min, power_5min, power_15min = power_load
-      amp_1min  = power_1min  / self.voltage_now
-      amp_5min  = power_5min  / self.voltage_now
-      amp_15min = power_15min / self.voltage_now
-      if min(amp_1min, amp_5min, amp_15min, self.charge_now) > 0.0:
-        seconds_1min  = round((self.charge_now / amp_1min)  * 3600.0)
-        seconds_5min  = round((self.charge_now / amp_5min)  * 3600.0)
-        seconds_15min = round((self.charge_now / amp_15min) * 3600.0)
-        return seconds_1min, seconds_5min, seconds_15min
-      elif self.current_now > 0.0:
-        return round((self.charge_now / self.current_now)  * 3600.0), 0, 0
-    return None
+    amp = tuple(funcy.map(lambda x: float(x / self.voltage_now), power_load))
+    if min(min(amp), self.charge_now) > 0.0:
+      return tuple(funcy.map(lambda x: round(float(self.charge_now / x)) * 3600.0, amp))
+    else:
+      return round((self.charge_now / self.current_now)  * 3600.0), 0, 0
 
   def get_time_estimate_h_min(self) -> Optional[Tuple[int, int, int, int, int, int]]:
-    time_estimate_seconds = self.get_time_estimate_seconds()
-    if time_estimate_seconds is None:
-      return None
-    h_1min = math.floor(time_estimate_seconds[0] / 3600.0)
-    m_1min = round(time_estimate_seconds[0] / 60.0 - (h_1min * 60))
-    h_5min = math.floor(time_estimate_seconds[1] / 3600.0)
-    m_5min = round(time_estimate_seconds[1] / 60.0 - (h_5min * 60))
-    h_15min = math.floor(time_estimate_seconds[2] / 3600.0)
-    m_15min = round(time_estimate_seconds[2] / 60.0 - (h_15min * 60))
-    return h_1min, m_1min, h_5min, m_5min, h_15min, m_15min
+    power_load = self.get_power_load()
+    amp        = tuple(funcy.map(lambda x: float(x / self.voltage_now), power_load))
+    m          = tuple(funcy.map(lambda x: x > 0 and (self.charge_now / x) * 60.0, amp))
+    h = tuple(funcy.map(lambda x: math.floor(float(x) / 60.0), m))
+    m = tuple(funcy.map(lambda x: round(x[0] - x[1] * 60.0), zip(m, h)))
+    return tuple(funcy.flatten(zip(h, m)))
 
   def get_current_stats(self) -> Tuple[BatteryStatus, float, float, int, int]:
     power = self.voltage_now * self.current_now
@@ -153,7 +159,7 @@ def update_thread(p_s: PowerStats, print_data: bool = False):
   while True:
     p_s.refresh_status()
     if print_data:
-      print(f"Points: {len(p_s.power_usage)} Status: {p_s.battery_status}")
+      print(f"Status: {p_s.battery_status}")
       power    = p_s.get_power_load()
       if power is not None:
         time_est = p_s.get_time_estimate_h_min()

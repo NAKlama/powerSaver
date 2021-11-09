@@ -368,8 +368,8 @@ def draw_menu(std_screen: curses.window):
 
       if k in [ord('+'), ord('-'), ord(','), ord('.')]:
         refresh                       = max(1, min(refresh, refresh_maximum))
-        power_sampling_rate           = max(1, min(power_sampling_rate, refresh_maximum))
-        effective_power_sampling_rate = max(1, min(effective_power_sampling_rate, refresh_maximum))
+        power_sampling_rate           = max(2, min(power_sampling_rate, refresh_maximum))
+        effective_power_sampling_rate = max(2, min(effective_power_sampling_rate, refresh_maximum))
       if k > 0:
         skip_render_menu = False
 

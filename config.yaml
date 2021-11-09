@@ -46,10 +46,14 @@ processes:
     name:
       - java
     cmdline: datagrip
+  - title: DrRacket
+    name:
+      - drracket
+    cmdline: DrRacket
   - title: LibreOffice
     name:
       - soffice.bin
-  - title: Pulse Audio Volume Contro
+  - title: Pulse Audio Volume Control
     name:
       - pavucontrol
   - title: Zen Monitor
@@ -60,11 +64,6 @@ processes:
       - quimup
 
 services:
-  - title: Bluetooth
-    name: bluetooth
-    needs-modules:
-      - uhid
-      - hidp
   - title: Docker
     name: docker
   - title: sshd
@@ -73,6 +72,11 @@ services:
     name: mpd
   - title: Mosquitto
     name: mosquitto
+  - title: Bluetooth
+    name: bluetooth
+    needs-modules:
+      - uhid
+      - hidp
   - title: WiFi
     name: net.wlo1
     needs-modules:

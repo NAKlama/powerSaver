@@ -26,5 +26,6 @@ setup(
     install_requires=[
         'psutil',
         'PyYAML',
+        'funcy',
     ],
 )

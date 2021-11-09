@@ -1,2 +1,4 @@
 venv/
 .error_*
+__pycache__/
+
