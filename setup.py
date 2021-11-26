@@ -15,11 +15,12 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from distutils.core import setup
+import version
 
 setup(
     name="powerSaver",
     description="Save power by controlling processes and services",
-    version='0.1.0',
+    version=version.PROGRAM_VERSION,
     license="GPLv3",
     author="Nina Alexandra Klama",
     author_email="gitlab@fklama.de",

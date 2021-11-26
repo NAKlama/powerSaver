@@ -24,10 +24,11 @@ from pathlib import Path
 from typing import Tuple, List, Dict, Union, Optional
 
 import powerSaver
+import version as ver
 from powerSaver.config_parser import ConfigParser
 
 application_name = "powerSaver"
-version = "1.2.5"
+version = ver.PROGRAM_VERSION
 default_config_file = 'config.yaml'
 
 config = ConfigParser(Path(default_config_file))
